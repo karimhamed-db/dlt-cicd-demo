@@ -1,0 +1,27 @@
+{
+    "name": "dlt-loan-demo",
+    "storage": "/demos/dlt_loan_demo",
+    "target": "dlt_demo_db",
+    "development": true,
+    "continuous": false,
+    "photon": false,
+    "channel": "CURRENT",
+    "edition": "ADVANCED",
+    "configuration": {},
+    "clusters": [
+        {
+            "label": "default",
+            "autoscale": {
+                "min_workers": 5,
+                "max_workers": 30
+            }
+        }
+    ],
+    "libraries": [
+        {
+            "notebook": {
+                "path": "{{location_prefix}}/notebooks/loan-pipeline"
+            }
+        }
+    ]
+}
