@@ -1,0 +1,52 @@
+# Python package
+# Create and test a Python package on multiple Python versions.
+# Add steps that analyze code, save the dist with the build record, publish to a PyPI-compatible index, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/python
+
+trigger:
+- azure/dev
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: 3.8
+  displayName: 'Use Python 3.8'
+
+- checkout: self
+  persistCredentials: true
+  clean: true
+
+- script: git checkout azure/dev
+  displayName: 'Get latest branch'
+
+- script: |
+    python -m pip install --upgrade pip
+    pip install -r unit-requirements.txt
+  displayName: 'Install dependencies'
+
+- script: |
+    sed -i "s|{{location_prefix}}|$(PIPELINE_LOCATION)/$(PIPELINE_NAME)|" ./pipelines/$(PIPELINE_NAME)/pipeline.json
+  displayName: 'Update pipeline location configuration'
+
+- script: |
+    databricks workspace import_dir -o pipelines/$(PIPELINE_NAME) $(PIPELINE_LOCATION)/$(PIPELINE_NAME)
+  displayName: 'Copy notebooks'
+  env:
+    DATABRICKS_TOKEN: $(DATABRICKS_TOKEN) 
+
+- script: |
+    pipeline_id=$(databricks pipelines list | jq -r --arg PIPELINE_NAME "$(PIPELINE_NAME)" '.[] | select(.name==$PIPELINE_NAME) | .pipeline_id')
+    if [ -z "$pipeline_id" ]
+    then
+          echo "Creating Pipeline"
+          databricks pipelines create --settings pipelines/$(PIPELINE_NAME)/pipeline.json
+    else
+          echo "Updating Pipeline"
+          databricks pipelines edit --pipeline-id $pipeline_id --settings pipelines/$(PIPELINE_NAME)/pipeline.json
+    fi
+  displayName: 'Deploy DLT pipelines'
+  env:
+    DATABRICKS_TOKEN: $(DATABRICKS_TOKEN) 
