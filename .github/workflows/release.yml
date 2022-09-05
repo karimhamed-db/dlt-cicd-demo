@@ -1,0 +1,56 @@
+name: Release pipeline
+
+on:
+  push:
+    branches:
+      - 'master'
+
+jobs:
+  release-pipeline:
+    environment: prod
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN:  ${{ secrets.DATABRICKS_TOKEN }}
+      PIPELINE_LOCATION: /Shared/production/pipelines
+      PIPELINE_NAME: dlt-loan-demo
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.8
+
+      - name: Install pip
+        run: |
+          python -m pip install --upgrade pip
+      - name: Install dependencies and project
+        run: |
+          pip install -r unit-requirements.txt
+
+      - name: Copy notebooks
+        run: |
+          databricks workspace import_dir -o pipelines/$PIPELINE_NAME $PIPELINE_LOCATION/$PIPELINE_NAME
+
+      - name: Update pipeline location configuration
+        run: |
+          sed -i "s|{{location_prefix}}|$PIPELINE_LOCATION/$PIPELINE_NAME|" ./pipelines/$PIPELINE_NAME/pipeline.json
+
+      - name: Deploy DLT pipelines
+        run: |
+          pipeline_id=$(databricks pipelines list | jq -r --arg PIPELINE_NAME "$PIPELINE_NAME" '.[] | select(.name==$PIPELINE_NAME) | .pipeline_id')
+          if [ -z "$pipeline_id" ]
+          then
+                echo "Creating Pipeline"
+                databricks pipelines create --settings pipelines/$PIPELINE_NAME/pipeline.json
+          else
+                echo "Updating Pipeline"
+                databricks pipelines edit --pipeline-id $pipeline_id --settings pipelines/$PIPELINE_NAME/pipeline.json
+          fi
+
+
