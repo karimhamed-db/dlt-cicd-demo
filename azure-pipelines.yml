@@ -4,7 +4,7 @@
 # https://docs.microsoft.com/azure/devops/pipelines/languages/python
 
 trigger:
-- azure/dev
+- azure/main
 
 pool:
   vmImage: ubuntu-latest
@@ -19,7 +19,7 @@ steps:
   persistCredentials: true
   clean: true
 
-- script: git checkout azure/dev
+- script: git checkout azure/main
   displayName: 'Get latest branch'
 
 - script: |
@@ -32,7 +32,7 @@ steps:
   displayName: 'Update pipeline location configuration'
 
 - script: |
-    databricks workspace import_dir -o pipelines/$(PIPELINE_NAME) $(PIPELINE_LOCATION)/$(PIPELINE_NAME)
+    databricks repos update --path /Repos/Production/dlt-cicd-demo --branch azure/main
   displayName: 'Copy notebooks'
   env:
     DATABRICKS_TOKEN: $(DATABRICKS_TOKEN) 
