@@ -28,25 +28,33 @@ steps:
   displayName: 'Install dependencies'
 
 - script: |
-    sed -i "s|{{location_prefix}}|$(PIPELINE_LOCATION)/$(PIPELINE_NAME)|" ./pipelines/$(PIPELINE_NAME)/pipeline.json
-  displayName: 'Update pipeline location configuration'
-
-- script: |
-    databricks repos update --path /Repos/Production/dlt-cicd-demo --branch azure/main
-  displayName: 'Copy notebooks'
+    databricks repos update --path $REPO_LOCATION --branch azure/main
+  displayName: 'Update notebooks'
   env:
     DATABRICKS_TOKEN: $(DATABRICKS_TOKEN) 
 
 - script: |
-    pipeline_id=$(databricks pipelines list | jq -r --arg PIPELINE_NAME "$(PIPELINE_NAME)" '.[] | select(.name==$PIPELINE_NAME) | .pipeline_id')
-    if [ -z "$pipeline_id" ]
-    then
-          echo "Creating Pipeline"
-          databricks pipelines create --settings pipelines/$(PIPELINE_NAME)/pipeline.json
-    else
-          echo "Updating Pipeline"
-          databricks pipelines edit --pipeline-id $pipeline_id --settings pipelines/$(PIPELINE_NAME)/pipeline.json
-    fi
+    for PIPELINE_DIRECTORY in ./pipelines/*
+    do
+      if [ -d "$PIPELINE_DIRECTORY" ]
+      then
+        PIPELINE_NAME=$(basename $PIPELINE_DIRECTORY)
+        echo "Deploying $PIPELINE_NAME"
+
+        echo "Update $PIPELINE_NAME pipeline location configuration to $REPO_LOCATION/pipelines/$PIPELINE_NAME"
+        sed -i "s|{{location_prefix}}|$REPO_LOCATION/pipelines/$PIPELINE_NAME|" $PIPELINE_DIRECTORY/pipeline.json
+
+        pipeline_id=$(databricks pipelines list | jq -r --arg pipeline_name "$PIPELINE_NAME" '.[] | select(.name==$pipeline_name) | .pipeline_id')
+        if [ -z "$pipeline_id" ]
+        then
+          echo "Creating $PIPELINE_NAME Pipeline"
+          databricks pipelines create --settings $PIPELINE_DIRECTORY/pipeline.json
+        else
+          echo "Updating $PIPELINE_NAME Pipeline"
+          databricks pipelines edit --pipeline-id $pipeline_id --settings $PIPELINE_DIRECTORY/pipeline.json
+        fi
+      fi
+    done
   displayName: 'Deploy DLT pipelines'
   env:
     DATABRICKS_TOKEN: $(DATABRICKS_TOKEN) 
